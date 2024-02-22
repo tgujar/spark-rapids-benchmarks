@@ -204,8 +204,8 @@ def run_query_stream(input_prefix,
                      delta_unmanaged=False,
                      keep_sc=False,
                      hive_external=False,
-                     allow_failure=False
-                     ):
+                     allow_failure=False,
+                     runs=1):
     """run SQL in Spark and record execution time log. The execution time log is saved as a CSV file
     for easy accesibility. TempView Creation time is also recorded.
 
@@ -262,28 +262,29 @@ def run_query_stream(input_prefix,
         query_dict = get_query_subset(query_dict, sub_queries)
     # Run query
     power_start = int(time.time())
-    for query_name, q_content in query_dict.items():
-        # show query name in Spark web UI
-        spark_session.sparkContext.setJobGroup(query_name, query_name)
-        print("====== Run {} ======".format(query_name))
-        q_report = PysparkBenchReport(spark_session, query_name)
-        summary = q_report.report_on(run_one_query,spark_session,
-                                                   q_content,
-                                                   query_name,
-                                                   output_path,
-                                                   output_format)
-        print(f"Time taken: {summary['queryTimes']} millis for {query_name}")
-        query_times = summary['queryTimes']
-        execution_time_list.append((spark_app_id, query_name, query_times[0]))
-        queries_reports.append(q_report)
-        if json_summary_folder:
-            # property_file e.g.: "property/aqe-on.properties" or just "aqe-off.properties"
-            if property_file:
-                summary_prefix = os.path.join(
-                    json_summary_folder, os.path.basename(property_file).split('.')[0])
-            else:
-                summary_prefix =  os.path.join(json_summary_folder, '')
-            q_report.write_summary(prefix=summary_prefix)
+    for _ in range(runs):
+        for query_name, q_content in query_dict.items():
+            # show query name in Spark web UI
+            spark_session.sparkContext.setJobGroup(query_name, query_name)
+            print("====== Run {} ======".format(query_name))
+            q_report = PysparkBenchReport(spark_session, query_name)
+            summary = q_report.report_on(run_one_query,spark_session,
+                                                    q_content,
+                                                    query_name,
+                                                    output_path,
+                                                    output_format)
+            print(f"Time taken: {summary['queryTimes']} millis for {query_name}")
+            query_times = summary['queryTimes']
+            execution_time_list.append((spark_app_id, query_name, query_times[0]))
+            queries_reports.append(q_report)
+            if json_summary_folder:
+                # property_file e.g.: "property/aqe-on.properties" or just "aqe-off.properties"
+                if property_file:
+                    summary_prefix = os.path.join(
+                        json_summary_folder, os.path.basename(property_file).split('.')[0])
+                else:
+                    summary_prefix =  os.path.join(json_summary_folder, '')
+                q_report.write_summary(prefix=summary_prefix)
     power_end = int(time.time())
     power_elapse = int((power_end - power_start)*1000)
     if not keep_sc:
@@ -402,9 +403,12 @@ if __name__ == "__main__":
                         action='store_true',
                         help='Do not exit with non zero when any query failed or any task failed')
     parser.add_argument('--run_single',
-                        action='store_false',
-                        default=True,
-                        help='Run from a file containing single query, False by default')
+                        action='store_true',
+                        default=False,
+                        help='Run from a file containing single query, False by default. tream requires the presence of certain limiters between queries and template numbers. This option is a workaround to run one off queries')
+    parser.add_argument('--runs',
+                       default=1,
+                       help='Number of runs in a single Spark session')
     args = parser.parse_args()
     query_dict = gen_sql_from_stream(args.query_file, args.run_single)
     run_query_stream(args.input_prefix,
@@ -422,4 +426,5 @@ if __name__ == "__main__":
                      args.delta_unmanaged,
                      args.keep_sc,
                      args.hive,
-                     args.allow_failure)
+                     args.allow_failure,
+                     int(args.runs))
