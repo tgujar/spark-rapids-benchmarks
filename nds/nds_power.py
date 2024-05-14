@@ -42,7 +42,7 @@ from pyspark.sql import DataFrame
 
 from check import check_json_summary_folder, check_query_subset_exists, check_version
 from nds_gen_query_stream import split_special_query
-from nds_schema import get_schemas
+from nds_schema import get_tpcds_schemas, get_tpch_schemas
 
 check_version()
 
@@ -76,7 +76,7 @@ def gen_sql_from_stream(query_stream_file_path):
         extended_queries[q_name] = '-- start' + q_content
     return extended_queries
 
-def setup_tables(spark_session, input_prefix, input_format, use_decimal, execution_time_list):
+def setup_tables(spark_session, input_prefix, input_format, use_decimal, execution_time_list, benchmark_type):
     """set up data tables in Spark before running the Power Run queries.
 
     Args:
@@ -90,13 +90,16 @@ def setup_tables(spark_session, input_prefix, input_format, use_decimal, executi
         execution_time_list: a list recording query execution time.
     """
     spark_app_id = spark_session.sparkContext.applicationId
+    schemas = get_tpcds_schemas
+    if(benchmark_type == "tpch"):
+        schemas = get_tpch_schemas
     # Create TempView for tables
-    for table_name in get_schemas(False).keys():
+    for table_name in schemas(False).keys():
         start = int(time.time() * 1000)
         table_path = input_prefix + '/' + table_name
         reader =  spark_session.read.format(input_format)
         if input_format in ['csv', 'json']:
-            reader = reader.schema(get_schemas(use_decimal)[table_name])
+            reader = reader.schema(schemas(use_decimal)[table_name])
         reader.load(table_path).createOrReplaceTempView(table_name)
         end = int(time.time() * 1000)
         print("====== Creating TempView for table {} ======".format(table_name))
@@ -108,7 +111,7 @@ def setup_tables(spark_session, input_prefix, input_format, use_decimal, executi
 def register_delta_tables(spark_session, input_prefix, execution_time_list):
     spark_app_id = spark_session.sparkContext.applicationId
     # Register tables for Delta Lake
-    for table_name in get_schemas(False).keys():
+    for table_name in get_tpcds_schemas(False).keys():
         start = int(time.time() * 1000)
         # input_prefix must be absolute path: https://github.com/delta-io/delta/issues/555
         register_sql = f"CREATE TABLE IF NOT EXISTS {table_name} USING DELTA LOCATION '{input_prefix}/{table_name}'"
@@ -181,7 +184,8 @@ def get_query_subset(query_dict, subset):
     return dict((k, query_dict[k]) for k in subset)
 
 
-def run_query_stream(input_prefix,
+def run_query_stream(benchmark_type,
+                     input_prefix,
                      property_file,
                      query_dict,
                      time_log_output_path,
@@ -241,11 +245,13 @@ def run_query_stream(input_prefix,
 
     if input_format == 'delta' and delta_unmanaged:
         # Register tables for Delta Lake. This is only needed for unmanaged tables.
+        if benchmark_type == "tpch":
+            raise ValueError("TPCH not supported")
         execution_time_list = register_delta_tables(spark_session, input_prefix, execution_time_list)
     spark_app_id = spark_session.sparkContext.applicationId
     if input_format != 'iceberg' and input_format != 'delta' and not hive_external:
         execution_time_list = setup_tables(spark_session, input_prefix, input_format, use_decimal,
-                                           execution_time_list)
+                                           execution_time_list, benchmark_type)
 
     check_json_summary_folder(json_summary_folder)
     if sub_queries:
@@ -331,6 +337,9 @@ def load_properties(filename):
 
 if __name__ == "__main__":
     parser = parser = argparse.ArgumentParser()
+    parser.add_argument('benchmark_type',
+                        help='tpch or tpcds',
+                        default="tpcds")
     parser.add_argument('input_prefix',
                         help='text to prepend to every input file path (e.g., "hdfs:///ds-generated-data"). ' +
                         'If --hive or if input_format is "iceberg", this argument will be regarded as the value of property ' +
@@ -393,7 +402,8 @@ if __name__ == "__main__":
                         help='Do not exit with non zero when any query failed or any task failed')
     args = parser.parse_args()
     query_dict = gen_sql_from_stream(args.query_stream_file)
-    run_query_stream(args.input_prefix,
+    run_query_stream(args.benchmark_type,
+                     args.input_prefix,
                      args.property_file,
                      query_dict,
                      args.time_log,

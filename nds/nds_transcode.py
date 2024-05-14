@@ -167,8 +167,8 @@ def transcode(args):
     session.sparkContext.setLogLevel(args.log_level)
     results = {}
 
-    schemas = get_schemas(use_decimal=not args.floats)
-    maintenance_schemas = get_maintenance_schemas(use_decimal=not args.floats)
+    schemas = get_tpcds_schemas(use_decimal=not args.floats)
+    maintenance_schemas = get_maintenance_tpcds_schemas(use_decimal=not args.floats)
 
     if args.update:
         trans_tables = maintenance_schemas

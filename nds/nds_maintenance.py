@@ -39,7 +39,7 @@ from pyspark.sql import SparkSession
 from PysparkBenchReport import PysparkBenchReport
 
 from check import check_json_summary_folder, get_abs_path
-from nds_schema import get_maintenance_schemas
+from nds_schema import get_maintenance_tpcds_schemas
 from nds_power import register_delta_tables
 
 INSERT_FUNCS = [
@@ -268,7 +268,7 @@ def run_query(spark_session,
         writer.writerows(execution_time_list)
     
 def register_temp_views(spark_session, refresh_data_path):
-    refresh_tables = get_maintenance_schemas(True)
+    refresh_tables = get_maintenance_tpcds_schemas(True)
     for table, schema in refresh_tables.items():
         spark_session.read.option("delimiter", '|').option(
             "header", "false").csv(refresh_data_path + '/' + table, schema=schema).createOrReplaceTempView(table)

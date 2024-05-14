@@ -46,7 +46,110 @@ def decimalType(use_decimal, precision, scale):
     else:
         return DoubleType()
 
-def get_schemas(use_decimal):
+def get_tpch_schemas(use_decimal):
+    """
+     get the schemas of all tables. If use_decimal is True, DecimalType are applied, otherwide,
+    DoubleType will be used for DecimalType.
+
+    Args:
+        use_decimal (bool): use decimal or not
+
+    Returns:
+        dict: {table_name: schema}
+    """
+     
+    SCHEMAS = dict()
+    identifier_int = IntegerType()
+    decimal_type = decimalType(use_decimal, 12, 2)
+
+    SCHEMAS["part"] = StructType([
+        StructField("p_partkey", identifier_int, nullable=False),
+        StructField("p_name", VarcharType(55)),
+        StructField("p_mfgr", CharType(25)),
+        StructField("p_brand", CharType(10)),
+        StructField("p_type", VarcharType(25)),
+        StructField("p_size", IntegerType()),
+        StructField("p_container", CharType(10)),
+        StructField("p_retailprice", decimal_type),
+        StructField("p_comment", VarcharType(23))
+    ])
+
+    SCHEMAS["supplier"] = StructType([
+        StructField("s_suppkey", identifier_int, nullable=False),
+        StructField("s_name", CharType(25)),
+        StructField("s_address", VarcharType(40)),
+        StructField("s_nationkey", identifier_int, nullable=False),
+        StructField("s_phone", CharType(15)),
+        StructField("s_acctbal", decimal_type),
+        StructField("s_comment", VarcharType(101))
+    ])
+
+    SCHEMAS["partsupp"] = StructType([
+         StructField("ps_partkey", identifier_int, nullable=False),
+        StructField("ps_suppkey", identifier_int, nullable=False),
+        StructField("ps_availqty", IntegerType()),
+        StructField("ps_supplycost", decimal_type),
+        StructField("ps_comment", VarcharType(199))
+    ])
+
+    SCHEMAS["customer"] = StructType([
+        StructField("c_custkey", identifier_int, nullable=False),
+        StructField("c_name", CharType(25)),
+        StructField("c_address", VarcharType(40)),
+        StructField("c_nationkey", identifier_int, nullable=False),
+        StructField("c_phone", CharType(15)),
+        StructField("c_acctbal", decimal_type),
+        StructField("c_mktsegment", CharType(10)),
+        StructField("c_comment", VarcharType(117))
+    ])
+
+    SCHEMAS["orders"] = StructType([
+        StructField("o_orderkey", identifier_int, nullable=False),
+        StructField("o_custkey", identifier_int, nullable=False),
+        StructField("o_orderstatus", CharType(1)),
+        StructField("o_totalprice", decimal_type),
+        StructField("o_orderdate", DateType()),
+        StructField("o_orderpriority", CharType(15)),
+        StructField("o_clerk", CharType(15)),
+        StructField("o_shippriority", IntegerType()),
+        StructField("o_comment", VarcharType(79))
+    ])
+
+    SCHEMAS["lineitem"] = StructType([
+        StructField("l_orderkey", identifier_int, nullable=False),
+        StructField("l_partkey", identifier_int, nullable=False),
+        StructField("l_suppkey", identifier_int, nullable=False),
+        StructField("l_linenumber", identifier_int),
+        StructField("l_quantity", decimal_type),
+        StructField("l_extendedprice", decimal_type),
+        StructField("l_discount", decimal_type),
+        StructField("l_tax", decimal_type),
+        StructField("l_returnflag", CharType(1)),
+        StructField("l_linestatus", CharType(1)),
+        StructField("l_shipdate", DateType()),
+        StructField("l_commitdate", DateType()),
+        StructField("l_receiptdate", DateType()),
+        StructField("l_shipinstruct", CharType(25)),
+        StructField("l_shipmode", CharType(10)),
+        StructField("l_comment", VarcharType(44))
+    ])
+
+    SCHEMAS["nation"] = StructType([
+        StructField("n_nationkey", identifier_int, nullable=False),
+        StructField("n_name", CharType(25)),
+        StructField("n_regionkey", identifier_int, nullable=False),
+        StructField("l_comment", VarcharType(152))
+    ])
+
+    SCHEMAS["region"] = StructType([
+        StructField("r_regionkey", identifier_int, nullable=False),
+        StructField("r_name", CharType(25)),
+        StructField("r_comment", VarcharType(152))
+    ])
+
+    return SCHEMAS
+
+def get_tpcds_schemas(use_decimal):
     """get the schemas of all tables. If use_decimal is True, DecimalType are applied, otherwide,
     DoubleType will be used for DecimalType.
 
@@ -567,7 +670,7 @@ def get_schemas(use_decimal):
     ])
     return SCHEMAS
 
-def get_maintenance_schemas(use_decimal):
+def get_maintenance_tpcds_schemas(use_decimal):
     MAINTENANCE_SCHEMAS = {}
     MAINTENANCE_SCHEMAS["s_purchase_lineitem"] = StructType([
         StructField("plin_purchase_id", IntegerType(), nullable=False),
@@ -717,7 +820,9 @@ def get_maintenance_schemas(use_decimal):
 
 if __name__ == "__main__":
     # Test code
-    print(get_schemas(False))
-    print(get_schemas(True))
-    print(get_maintenance_schemas(False))
-    print(get_maintenance_schemas(True))
+    print(get_tpch_schemas(False))
+    print(get_tpch_schemas(True))
+    print(get_tpcds_schemas(False))
+    print(get_tpcds_schemas(True))
+    print(get_maintenance_tpcds_schemas(False))
+    print(get_maintenance_tpcds_schemas(True))
